@@ -4,6 +4,7 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Matrix;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.RectF;
@@ -51,6 +52,10 @@ public class ClockView extends View {
      * 刻度盘 圆弧 上 横着的线条
      */
     private Paint mScaleLinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    /**
+     * 秒针
+     */
+    private Paint mSecondPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     private SweepGradient mSweepGradient;
     /**
@@ -75,11 +80,15 @@ public class ClockView extends View {
      * 一个文字的显示范围
      */
     private Rect mOneTextRect;
-    //时分秒
+    //时分秒  角度
     private float mSecondDegree;
     private float mMinuteDegree;
     private float mHourDegree;
     private Matrix mGradientMatrix;
+    /**
+     * 秒针 path
+     */
+    private Path mSecondHandPath = new Path();
 
     public ClockView(Context context) {
         this(context, null);
@@ -108,6 +117,8 @@ public class ClockView extends View {
         mScaleArcPaint.setStyle(Paint.Style.STROKE);
         mScaleLinePaint.setColor(DEFAULT_BACKGROUND_COLOR);
         mScaleLinePaint.setStyle(Paint.Style.STROKE);
+
+        mSecondPaint.setColor(SCALE_STOP_COLOR);
     }
 
     @Override
@@ -141,7 +152,23 @@ public class ClockView extends View {
         drawText(canvas);
         drawOuterCircle(canvas);
         drawDial(canvas);
+        drawSecondHand(canvas);
         invalidate();
+    }
+
+    /**
+     * 获取当前 时分秒 所对应的角度
+     * 为了不让秒针走得像老式挂钟一样僵硬，需要精确到毫秒
+     */
+    private void getTimeDegree() {
+        Calendar calendar = Calendar.getInstance();
+        float milliSecond = calendar.get(Calendar.MILLISECOND);
+        float second = calendar.get(Calendar.SECOND) + milliSecond / 1000;
+        float minute = calendar.get(Calendar.MINUTE) + second / 60;
+        float hour = calendar.get(Calendar.HOUR) + minute / 60;
+        mSecondDegree = second / 60 * 360;
+        mMinuteDegree = minute / 60 * 360;
+        mHourDegree = hour / 12 * 360;
     }
 
     /**
@@ -212,27 +239,28 @@ public class ClockView extends View {
         //因为涉及到旋转,所以需要先save()再restore()
         canvas.save();
         for (int i = 0; i < 200; i++) {
-            canvas.drawLine(mWidth / 2, getPaddingTop() + mScaleLength ,
-                    mWidth / 2, getPaddingTop() + mScaleLength * 2 +mTwoTextRect.height(), mScaleLinePaint);
+            canvas.drawLine(mWidth / 2, getPaddingTop() + mScaleLength,
+                    mWidth / 2, getPaddingTop() + mScaleLength * 2 + mTwoTextRect.height(), mScaleLinePaint);
             //每次转动1.8°  转200次
             canvas.rotate(1.8f, mWidth / 2, mHeight / 2);
         }
         canvas.restore();
     }
 
-    /**
-     * 获取当前 时分秒 所对应的角度
-     * 为了不让秒针走得像老式挂钟一样僵硬，需要精确到毫秒
-     */
-    private void getTimeDegree() {
-        Calendar calendar = Calendar.getInstance();
-        float milliSecond = calendar.get(Calendar.MILLISECOND);
-        float second = calendar.get(Calendar.SECOND) + milliSecond / 1000;
-        float minute = calendar.get(Calendar.MINUTE) + second / 60;
-        float hour = calendar.get(Calendar.HOUR) + minute / 60;
-        mSecondDegree = second / 60 * 360;
-        mMinuteDegree = minute / 60 * 360;
-        mHourDegree = hour / 12 * 360;
+    private void drawSecondHand(Canvas canvas) {
+        //画秒针，用Path绘制一个指向12点钟的三角形，通过不断旋转画布实现秒针的旋转：
+        canvas.save();
+        //旋转秒针的角度
+        canvas.rotate(mSecondDegree, mWidth / 2, mHeight / 2);
+        mSecondHandPath.reset();
+
+        float offset = getPaddingTop() + mTwoTextRect.height() / 2;
+        mSecondHandPath.moveTo(getWidth() / 2, offset + 0.27f * mRadius);
+        mSecondHandPath.lineTo(getWidth() / 2 - 0.05f * mRadius, offset + 0.35f * mRadius);
+        mSecondHandPath.lineTo(getWidth() / 2 + 0.05f * mRadius, offset + 0.35f * mRadius);
+        mSecondHandPath.close();
+        canvas.drawPath(mSecondHandPath, mSecondPaint);
+        canvas.restore();
     }
 
 }
